@@ -5,6 +5,7 @@ import '../../core/api/api_client.dart';
 import '../../models/availability.dart';
 import '../../models/staff.dart';
 import '../../repositories/repositories.dart';
+import 'discover_screen.dart';
 import 'widgets/booking_widgets.dart';
 
 /// Vaxt seçmə ekranı.
@@ -26,7 +27,6 @@ class _BookScreenState extends State<BookScreen> {
   static const _customerRepo = CustomerRepository();
   static const _bookingRepo = BookingRepository();
 
-  List<BusinessCard> _businesses = const [];
   List<StaffMember> _staff = const [];
   List<ServiceItem> _services = const [];
 
@@ -39,7 +39,6 @@ class _BookScreenState extends State<BookScreen> {
   DayAvailability? _day;
   AvailabilityResult? _availability;
 
-  bool _loadingBusinesses = true;
   bool _loadingSlots = false;
   bool _booking = false;
   String? _error;
@@ -47,35 +46,6 @@ class _BookScreenState extends State<BookScreen> {
   @override
   void initState() {
     super.initState();
-    _loadBusinesses();
-  }
-
-  Future<void> _loadBusinesses() async {
-    setState(() {
-      _loadingBusinesses = true;
-      _error = null;
-    });
-
-    try {
-      final businesses = await _publicRepo.listBusinesses();
-      if (!mounted) return;
-
-      setState(() {
-        _businesses = businesses;
-        _loadingBusinesses = false;
-      });
-
-      if (businesses.length == 1) {
-        // Tək biznes varsa seçim addımını atlayırıq.
-        await _selectBusiness(businesses.first);
-      }
-    } on ApiException catch (exception) {
-      if (!mounted) return;
-      setState(() {
-        _error = exception.message;
-        _loadingBusinesses = false;
-      });
-    }
   }
 
   Future<void> _selectBusiness(BusinessCard business) async {
@@ -251,36 +221,9 @@ class _BookScreenState extends State<BookScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    if (_loadingBusinesses) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_businesses.isEmpty) {
-      return EmptyState(
-        icon: Icons.storefront_outlined,
-        message: _error ?? 'Hazırda əlçatan biznes yoxdur',
-      );
-    }
-
-    // Addım 1 — biznes seçimi.
+    // Addım 1 — kəşf: sahə seç → biznes seç.
     if (_business == null) {
-      return ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: _businesses.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
-        itemBuilder: (context, index) {
-          final business = _businesses[index];
-          return Card(
-            child: ListTile(
-              title: Text(business.name),
-              subtitle:
-                  business.subtitle.isEmpty ? null : Text(business.subtitle),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => _selectBusiness(business),
-            ),
-          );
-        },
-      );
+      return DiscoverScreen(onBusinessSelected: _selectBusiness);
     }
 
     return Column(

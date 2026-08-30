@@ -294,9 +294,28 @@ class BookingRepository {
 class PublicRepository {
   const PublicRepository();
 
-  Future<List<BusinessCard>> listBusinesses() async {
+  /// Xidmət sahələri — hər birində neçə biznes olduğu ilə.
+  Future<List<ServiceCategory>> listCategories() async {
     final data = await ApiClient.instance.unwrap<dynamic>(
-      ApiClient.instance.dio.get<dynamic>('/public/businesses'),
+      ApiClient.instance.dio.get<dynamic>('/public/categories'),
+    );
+    return _asList(data).map(ServiceCategory.fromJson).toList();
+  }
+
+  /// Bizneslər. [category] verilsə yalnız həmin sahə, [query] verilsə
+  /// ad/sahə üzrə axtarış.
+  Future<List<BusinessCard>> listBusinesses({
+    String? category,
+    String? query,
+  }) async {
+    final data = await ApiClient.instance.unwrap<dynamic>(
+      ApiClient.instance.dio.get<dynamic>(
+        '/public/businesses',
+        queryParameters: {
+          if (category != null && category.isNotEmpty) 'category': category,
+          if (query != null && query.trim().isNotEmpty) 'q': query.trim(),
+        },
+      ),
     );
     return _asList(data).map(BusinessCard.fromJson).toList();
   }
