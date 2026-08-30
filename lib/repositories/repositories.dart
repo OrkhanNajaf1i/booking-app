@@ -57,6 +57,50 @@ class AuthRepository {
     return claims;
   }
 
+  /// Müştəri qeydiyyatı.
+  ///
+  /// `account_type: customer` göndərilir — admin panel isə "provider"
+  /// göndərir. Backend rolu buna görə təyin edir, ona görə istifadəçi
+  /// səhv tərəfdə hesab açmır.
+  Future<SessionClaims> register({
+    required String fullName,
+    required String email,
+    required String phone,
+    required String password,
+  }) async {
+    final data = await ApiClient.instance.unwrap<Map<String, dynamic>>(
+      ApiClient.instance.dio.post<dynamic>(
+        '/auth/register',
+        data: {
+          'full_name': fullName,
+          'email': email,
+          'phone': phone,
+          'password': password,
+          'account_type': 'customer',
+        },
+      ),
+    );
+
+    final access = data['access_token'] as String?;
+    if (access == null) {
+      throw const ApiException(
+        code: 'NO_TOKEN',
+        message: 'Server token qaytarmadı',
+      );
+    }
+
+    await TokenStorage.instance.save(
+      access: access,
+      refresh: data['refresh_token'] as String?,
+    );
+
+    final claims = TokenStorage.instance.claims;
+    if (claims == null) {
+      throw const ApiException(code: 'BAD_TOKEN', message: 'Token oxunmadı');
+    }
+    return claims;
+  }
+
   Future<void> logout() => TokenStorage.instance.clear();
 }
 
