@@ -6,6 +6,7 @@ import 'core/api/api_client.dart';
 import 'core/api/token_storage.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/login_screen.dart';
+import 'features/auth/register_screen.dart';
 import 'features/shell/home_shell.dart';
 import 'repositories/repositories.dart';
 import 'state/app_state.dart';
@@ -35,7 +36,7 @@ class BookingApp extends StatelessWidget {
         ),
       ],
       child: MaterialApp(
-        title: 'Booking',
+        title: 'Randevu — onlayn bron',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light(),
         darkTheme: AppTheme.dark(),
@@ -54,6 +55,9 @@ class _Root extends StatefulWidget {
 }
 
 class _RootState extends State<_Root> {
+  /// Sessiya yoxdursa login yoxsa qeydiyyat gosterilsin?
+  bool _showRegister = false;
+
   @override
   void initState() {
     super.initState();
@@ -69,7 +73,15 @@ class _RootState extends State<_Root> {
     final auth = context.watch<AuthController>();
     final claims = auth.claims;
 
-    if (claims == null) return const LoginScreen();
+    if (claims == null) {
+      return _showRegister
+          ? RegisterScreen(
+              onShowLogin: () => setState(() => _showRegister = false),
+            )
+          : LoginScreen(
+              onShowRegister: () => setState(() => _showRegister = true),
+            );
+    }
 
     // BookingController rola bağlıdır — rol dəyişəndə yenisi qurulmalıdır,
     // ona görə key kimi userId + rol verilir.

@@ -57,6 +57,38 @@ class AuthController extends ChangeNotifier {
     }
   }
 
+  /// Müştəri qeydiyyatı — uğurlu olsa dərhal sessiya açılır.
+  Future<bool> register({
+    required String fullName,
+    required String email,
+    required String phone,
+    required String password,
+  }) async {
+    _loading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      _claims = await _repository.register(
+        fullName: fullName,
+        email: email,
+        phone: phone,
+        password: password,
+      );
+      RealtimeService.instance.start();
+      return true;
+    } on ApiException catch (exception) {
+      _error = exception.message;
+      return false;
+    } catch (_) {
+      _error = 'Gözlənilməz xəta baş verdi';
+      return false;
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> logout() async {
     await RealtimeService.instance.stop();
     await _repository.logout();
