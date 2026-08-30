@@ -1,3 +1,22 @@
+/// Xidmət sahəsi — müştəri əvvəlcə bunu seçir (Bərbər, Diş Həkimi…).
+///
+/// Ayrıca cədvəl deyil: bizneslərin `service_category` sahəsindən
+/// yığılır, ona görə yeni sahə əlavə etmək üçün kod dəyişmir.
+class ServiceCategory {
+  const ServiceCategory({required this.name, required this.count});
+
+  final String name;
+
+  /// Bu sahədə neçə aktiv biznes var.
+  final int count;
+
+  factory ServiceCategory.fromJson(Map<String, dynamic> json) =>
+      ServiceCategory(
+        name: json['name'] as String? ?? '',
+        count: (json['count'] as num?)?.toInt() ?? 0,
+      );
+}
+
 /// Biznes (xəstəxana, klinika, bərbərxana, usta).
 class BusinessCard {
   const BusinessCard({
