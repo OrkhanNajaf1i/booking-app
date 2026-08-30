@@ -41,9 +41,14 @@ class ApiClient {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
-          final token = TokenStorage.instance.accessToken;
-          if (token != null) {
-            options.headers['Authorization'] = 'Bearer $token';
+          // Auth endpoint-lerine kohne token qosulmamalidir: onlar
+          // sessiya yaradir, sessiya teleb etmir. Kohne/expired token
+          // gonderilse serverin davranisi qeyri-muyyen olur.
+          if (!_isAuthEndpoint(options.path)) {
+            final token = TokenStorage.instance.accessToken;
+            if (token != null) {
+              options.headers['Authorization'] = 'Bearer $token';
+            }
           }
           handler.next(options);
         },
@@ -62,7 +67,12 @@ class ApiClient {
           final alreadyRetried = options.extra['__retried'] == true;
 
           // 401 → refresh → bir dəfə təkrar.
-          if (status == 401 && !alreadyRetried) {
+          //
+          // Auth endpoint-leri istisnadir: /auth/login 401 qaytaranda bu
+          // "parol yanlisdir" demekdir, "sessiya bitib" yox. Refresh
+          // cehdi menasizdir ve istifadeci serverin esl mesaji evezine
+          // "Sessiya bitib" gorur.
+          if (status == 401 && !alreadyRetried && !_isAuthEndpoint(options.path)) {
             final refreshed = await _refreshToken();
 
             if (!refreshed) {
@@ -134,6 +144,11 @@ class ApiClient {
         },
       ),
     );
+  }
+
+  /// Sessiya teleb etmeyen endpoint-ler.
+  static bool _isAuthEndpoint(String path) {
+    return path.startsWith('/auth/') || path.startsWith('/public/');
   }
 
   static final ApiClient instance = ApiClient._();

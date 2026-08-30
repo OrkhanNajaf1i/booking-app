@@ -20,13 +20,14 @@ class RequestsScreen extends StatefulWidget {
 }
 
 class _RequestsScreenState extends State<RequestsScreen> {
-  static const _filters = <String?, String>{
-    null: 'Hamısı',
-    'pending': 'Təsdiq gözləyir',
-    'confirmed': 'Təsdiqlənib',
-    'reschedule_proposed': 'Təklif göndərilib',
-    'cancelled': 'Ləğv edilib',
-  };
+  /// (status, etiket) — status null olanda filtr tətbiq edilmir.
+  static const _filters = <(String?, String)>[
+    (null, 'Hamısı'),
+    ('pending', 'Təsdiq gözləyir'),
+    ('confirmed', 'Təsdiqlənib'),
+    ('reschedule_proposed', 'Təklif göndərilib'),
+    ('cancelled', 'Ləğv edilib'),
+  ];
 
   @override
   void initState() {
@@ -58,13 +59,14 @@ class _RequestsScreenState extends State<RequestsScreen> {
           child: ListView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            children: _filters.entries.map((entry) {
+            children: _filters.map((filter) {
+              final (status, label) = filter;
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: ChoiceChip(
-                  label: Text(entry.value),
-                  selected: controller.statusFilter == entry.key,
-                  onSelected: (_) => controller.setStatusFilter(entry.key),
+                  label: Text(label),
+                  selected: controller.statusFilter == status,
+                  onSelected: (_) => controller.setStatusFilter(status),
                 ),
               );
             }).toList(),
@@ -98,9 +100,13 @@ class _RequestsScreenState extends State<RequestsScreen> {
           ),
           const SizedBox(height: 12),
           Center(
-            child: Text(
-              controller.error ?? 'Bu filtrdə bron yoxdur',
-              style: Theme.of(context).textTheme.bodyMedium,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                _emptyMessage(controller.error),
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
             ),
           ),
         ],
@@ -131,6 +137,18 @@ class _RequestsScreenState extends State<RequestsScreen> {
         );
       },
     );
+  }
+
+  /// Backend mesajlari texniki olur; istifadəçiyə nə etməli olduğunu deyirik.
+  String _emptyMessage(String? error) {
+    if (error == null) return 'Bu filtrdə bron yoxdur';
+
+    if (error.contains('business')) {
+      return 'Biznesiniz hələ qurulmayıb.\n\n'
+          'Admin panelinə daxil olub biznes məlumatlarını tamamlayın — '
+          'bundan sonra randevu sorğuları burada görünəcək.';
+    }
+    return error;
   }
 
   Future<void> _openProposeSheet(Booking booking) async {
