@@ -1,0 +1,26 @@
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+.idea/
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+lib/firebase_options.dart
+
+# Flutter build cixislari
+.dart_tool/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Firebase konfiqurasiyasi — gizli saxlanilir
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+lib/firebase_options.dart
+
+# IDE
+.idea/
+*.iml
+.vscode/

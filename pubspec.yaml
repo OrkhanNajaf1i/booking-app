@@ -1,0 +1,48 @@
+name: booking_app
+description: Booking Platform — müştəri və provider (həkim, bərbər, usta) üçün mobil tətbiq.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.6.0 <4.0.0"  # withValues / CardThemeData ucun Flutter 3.27+
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # HTTP + interceptor-lar (token refresh)
+  dio: ^5.7.0
+
+  # Vəziyyət idarəetməsi — sadə ChangeNotifier modeli
+  provider: ^6.1.2
+
+  # Realtime bildirişlər üçün WebSocket
+  web_socket_channel: ^3.0.1
+
+  # Token və sessiya saxlanışı
+  shared_preferences: ^2.3.3
+
+  # Tarix/saat formatlaması (az_AZ)
+  intl: ^0.19.0
+
+  cupertino_icons: ^1.0.8
+
+  # ─────────────────────────────────────────────────────────────
+  # PUSH (opsional): telefon bağlı olanda bildiriş üçün.
+  # Aktivləşdirmək üçün:
+  #   1) Aşağıdakı iki sətrin şərhini götürün
+  #   2) `flutterfire configure` işlədin (android/app/google-services.json və
+  #      ios/Runner/GoogleService-Info.plist yaranır)
+  #   3) lib/core/push/push_service.dart içindəki TODO-ları açın
+  #
+  # firebase_core: ^3.8.0
+  # firebase_messaging: ^15.1.5
+  # ─────────────────────────────────────────────────────────────
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
