@@ -1,0 +1,35 @@
+# Netlify konfiqurasiyasi — Flutter web (musteri sayti).
+#
+# API_BASE_URL build zamani koda yazilir, ona gore Netlify panelinde
+# environment variable kimi teyin edin: FLUTTER_API_BASE_URL
+
+[build]
+  publish = "build/web"
+  command = """
+    if [ ! -d "$HOME/flutter" ]; then
+      git clone https://github.com/flutter/flutter.git -b stable --depth 1 "$HOME/flutter"
+    fi
+    export PATH="$HOME/flutter/bin:$PATH"
+    flutter --version
+    flutter pub get
+    flutter build web --release --dart-define=API_BASE_URL=$FLUTTER_API_BASE_URL
+  """
+
+# Tek sehifeli tetbiq: bilinmeyen yollar index.html-e yonlendirilir,
+# eks halda sehife yenilendikde 404 alinir.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Flutter build cixislari mezmun hash-i ile adlanir — uzun kes tehlukesizdir.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# index.html hemise taze olmalidir ki, yeni versiya derhal gorunsun.
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache"
