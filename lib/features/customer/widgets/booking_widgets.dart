@@ -99,12 +99,19 @@ class SlotGrid extends StatelessWidget {
     required this.day,
     required this.selected,
     required this.onSelect,
+    this.scheduleMissing = false,
   });
 
   final bool loading;
   final DayAvailability? day;
   final TimeSlot? selected;
   final ValueChanged<TimeSlot> onSelect;
+
+  /// Novbeti iki hefte boyu bir dene de acıq gun yoxdur.
+  ///
+  /// Bu "bu gun bagliyiq" deyil — xidmet gosteren hele qrafik qurmayib.
+  /// Ayri mesaj olmasa musteri her tarixi bir-bir yoxlayir.
+  final bool scheduleMissing;
 
   @override
   Widget build(BuildContext context) {
@@ -116,9 +123,18 @@ class SlotGrid extends StatelessWidget {
     }
 
     if (day == null || !day!.isWorkday) {
+      if (scheduleMissing) {
+        return const EmptyState(
+          icon: Icons.event_busy_outlined,
+          message: 'Bu xidmət göstərən hələ iş qrafikini qurmayıb',
+          hint: 'Yaxın iki həftədə açıq gün yoxdur. Birbaşa əlaqə saxlaya bilərsiniz.',
+        );
+      }
+
       return const EmptyState(
         icon: Icons.event_busy_outlined,
         message: 'Bu gün iş günü deyil',
+        hint: 'Başqa tarix seçin',
       );
     }
 
@@ -283,10 +299,16 @@ class BookingBar extends StatelessWidget {
 
 /// Boş vəziyyət göstəricisi.
 class EmptyState extends StatelessWidget {
-  const EmptyState({super.key, required this.icon, required this.message});
+  const EmptyState({
+    super.key,
+    required this.icon,
+    required this.message,
+    this.hint,
+  });
 
   final IconData icon;
   final String message;
+  final String? hint;
 
   @override
   Widget build(BuildContext context) {
@@ -305,6 +327,16 @@ class EmptyState extends StatelessWidget {
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
+          if (hint != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              hint!,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.outline,
+              ),
+            ),
+          ],
         ],
       ),
     );

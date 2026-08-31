@@ -40,6 +40,7 @@ class _BookScreenState extends State<BookScreen> {
   AvailabilityResult? _availability;
 
   bool _loadingSlots = false;
+  bool _scheduleMissing = false;
   bool _booking = false;
   String? _error;
 
@@ -171,6 +172,9 @@ class _BookScreenState extends State<BookScreen> {
         }
         return;
       }
+
+      // Iki hefte boyu bir acıq gun yoxdur: qrafik qurulmayib.
+      if (mounted) setState(() => _scheduleMissing = true);
     } on ApiException {
       // Tapilmasa secilmis gun oldugu kimi qalir.
     }
@@ -347,6 +351,7 @@ class _BookScreenState extends State<BookScreen> {
                 SlotGrid(
                   loading: _loadingSlots,
                   day: _day,
+                  scheduleMissing: _scheduleMissing,
                   selected: _slot,
                   onSelect: (slot) => setState(() => _slot = slot),
                 ),
