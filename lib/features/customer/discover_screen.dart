@@ -8,7 +8,10 @@ import '../../core/location/nearby_filter.dart';
 import '../../models/staff.dart';
 import '../../repositories/repositories.dart';
 import 'widgets/booking_widgets.dart';
+import 'widgets/business_map.dart';
+import 'widgets/discover_filters.dart';
 import 'widgets/location_sheet.dart';
+import '../../core/theme/app_theme.dart';
 
 /// Kəşf ekranı — müştəri xidmət göstərəni burada tapır.
 ///
@@ -45,6 +48,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   String _query = '';
 
   NearbyFilter? _nearby;
+  DiscoverSort _sort = DiscoverSort.relevance;
+
+  /// Nəticələr siyahı və ya xəritə kimi göstərilir. Siyahı adları
+  /// oxumaq, xəritə isə "hansı biri daha yaxındır" sualı üçündür.
+  bool _mapView = false;
 
   bool _loading = true;
   String? _error;
@@ -123,6 +131,34 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   Future<void> _reload() =>
       _showingCategories ? _loadCategories() : _loadBusinesses();
 
+  /// Sıralama serverdə deyil, burada tətbiq olunur: nəticə sayı azdır
+  /// və seçim dəyişəndə yenidən sorğu göndərmək mənasızdır.
+  List<BusinessCard> get _visibleBusinesses {
+    final items = [..._businesses];
+
+    switch (_sort) {
+      case DiscoverSort.relevance:
+        break;
+      case DiscoverSort.nearest:
+        // Məsafəsi bilinməyənlər sona düşür — "ən yaxın" siyahısında
+        // yuxarıda durmaları yanıldıcı olardı.
+        items.sort((a, b) {
+          final left = a.distanceKm;
+          final right = b.distanceKm;
+          if (left == null && right == null) return 0;
+          if (left == null) return 1;
+          if (right == null) return -1;
+          return left.compareTo(right);
+        });
+      case DiscoverSort.alphabetical:
+        items.sort(
+          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+        );
+    }
+
+    return items;
+  }
+
   /// Hər hərfdə sorğu göndərməmək üçün gecikdirilir.
   void _onSearchChanged(String value) {
     _debounce?.cancel();
@@ -155,8 +191,26 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final result = await LocationSheet.show(context, current: _nearby);
     if (result == null || !mounted) return;
 
-    final next = result.isCleared ? null : result;
-    setState(() => _nearby = next);
+    await _applyNearby(result.isCleared ? null : result);
+  }
+
+  /// Radius çipi — pəncərə açmadan dəyişir.
+  Future<void> _changeRadius(double radiusKm) async {
+    final current = _nearby;
+    if (current == null || current.radiusKm == radiusKm) return;
+
+    await _applyNearby(current.copyWith(radiusKm: radiusKm));
+  }
+
+  Future<void> _applyNearby(NearbyFilter? next) async {
+    setState(() {
+      _nearby = next;
+      // Yaxınlıq ləğv olunanda "ən yaxın" sıralaması mənasız qalır.
+      if (next == null && _sort == DiscoverSort.nearest) {
+        _sort = DiscoverSort.relevance;
+      }
+    });
+
     await _location.save(next);
     await _reload();
   }
@@ -193,35 +247,56 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           ),
         ),
 
-        // ─── Yaxınlıq zolağı ─────────────────────────────────
-        _NearbyBar(filter: _nearby, onTap: _pickLocation),
+        // ─── Süzgəclər ───────────────────────────────────────
+        DiscoverFilters(
+          nearby: _nearby,
+          sort: _sort,
+          // Say yalnız biznes siyahısında mənalıdır.
+          resultCount: _showingCategories ? null : _businesses.length,
+          showSort: !_showingCategories,
+          onPickLocation: _pickLocation,
+          onClearLocation: () => _applyNearby(null),
+          onRadiusChanged: _changeRadius,
+          onSortChanged: (value) => setState(() => _sort = value),
+        ),
 
-        // ─── Seçilmiş kateqoriya ─────────────────────────────
-        if (_category != null)
+        // ─── Nəticə başlığı ──────────────────────────────────
+        if (!_showingCategories)
           Padding(
-            padding: const EdgeInsets.fromLTRB(8, 4, 16, 4),
+            padding: const EdgeInsets.fromLTRB(8, 2, 12, 4),
             child: Row(
               children: [
-                IconButton(
-                  onPressed: _backToCategories,
-                  icon: const Icon(Icons.arrow_back),
-                  tooltip: 'Kateqoriyalara qayıt',
-                  style: IconButton.styleFrom(
-                    minimumSize: const Size(36, 36),
-                    padding: EdgeInsets.zero,
-                  ),
-                ),
+                if (_category != null)
+                  IconButton(
+                    onPressed: _backToCategories,
+                    icon: const Icon(Icons.arrow_back),
+                    tooltip: 'Kateqoriyalara qayıt',
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size(36, 36),
+                      padding: EdgeInsets.zero,
+                    ),
+                  )
+                else
+                  const SizedBox(width: 8),
+
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    _category!.name,
+                    _category?.name ?? 'Axtarış nəticələri',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: theme.textTheme.titleMedium,
                   ),
                 ),
+
+                // Siyahı ↔ xəritə. Xəritə koordinatı olan bizneslər
+                // üçün mənalıdır, ona görə heç birində ünvan yoxdursa
+                // düymə göstərilmir.
+                if (_businesses.any((item) => item.hasCoordinates))
+                  _ViewToggle(
+                    mapView: _mapView,
+                    onChanged: (value) => setState(() => _mapView = value),
+                  ),
               ],
             ),
           ),
@@ -282,91 +357,103 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       );
     }
 
+    final visible = _visibleBusinesses;
+
+    if (_mapView) {
+      return BusinessMap(
+        businesses: visible,
+        origin: _nearby,
+        onBusinessSelected: widget.onBusinessSelected,
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: _loadBusinesses,
       child: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: _businesses.length,
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        itemCount: visible.length,
         separatorBuilder: (_, __) => const SizedBox(height: 8),
         itemBuilder: (context, index) => _BusinessTile(
-          business: _businesses[index],
-          onTap: () => widget.onBusinessSelected(_businesses[index]),
+          business: visible[index],
+          onTap: () => widget.onBusinessSelected(visible[index]),
         ),
       ),
     );
   }
 }
 
-// ─── Yaxınlıq zolağı ─────────────────────────────────────────
+// ─── Siyahı ↔ xəritə ─────────────────────────────────────────
 
-class _NearbyBar extends StatelessWidget {
-  const _NearbyBar({required this.filter, required this.onTap});
+class _ViewToggle extends StatelessWidget {
+  const _ViewToggle({required this.mapView, required this.onChanged});
 
-  final NearbyFilter? filter;
+  final bool mapView;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _ToggleButton(
+            icon: Icons.view_list,
+            tooltip: 'Siyahı',
+            selected: !mapView,
+            onTap: () => onChanged(false),
+          ),
+          _ToggleButton(
+            icon: Icons.map_outlined,
+            tooltip: 'Xəritə',
+            selected: mapView,
+            onTap: () => onChanged(true),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ToggleButton extends StatelessWidget {
+  const _ToggleButton({
+    required this.icon,
+    required this.tooltip,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final active = filter != null;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+    return Tooltip(
+      message: tooltip,
       child: Material(
-        color: active
-            ? theme.colorScheme.primaryContainer
-            : theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(10),
-        clipBehavior: Clip.antiAlias,
+        color: selected ? theme.colorScheme.surface : Colors.transparent,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
         child: InkWell(
           onTap: onTap,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Row(
-              children: [
-                Icon(
-                  active ? Icons.near_me : Icons.near_me_outlined,
-                  size: 17,
-                  color: active
-                      ? theme.colorScheme.onPrimaryContainer
-                      : theme.colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        active ? filter!.label : 'Yaxınlıqdakıları göstər',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: active
-                              ? theme.colorScheme.onPrimaryContainer
-                              : theme.colorScheme.onSurface,
-                        ),
-                      ),
-                      if (active)
-                        Text(
-                          '${filter!.radiusLabel} radius',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onPrimaryContainer
-                                .withValues(alpha: 0.75),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.expand_more,
-                  size: 18,
-                  color: active
-                      ? theme.colorScheme.onPrimaryContainer
-                      : theme.colorScheme.onSurfaceVariant,
-                ),
-              ],
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: Icon(
+              icon,
+              size: 17,
+              color: selected
+                  ? theme.colorScheme.onSurface
+                  : theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ),
