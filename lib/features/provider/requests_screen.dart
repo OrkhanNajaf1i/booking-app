@@ -256,7 +256,7 @@ class _BookingCard extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0284C7).withValues(alpha: 0.08),
+                  color: AppPalette.infoBg,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Column(

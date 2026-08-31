@@ -9,6 +9,7 @@ import '../customer/my_bookings_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../provider/requests_screen.dart';
 import '../provider/schedule_screen.dart';
+import '../../core/theme/app_theme.dart';
 
 /// Ana çərçivə — alt naviqasiya rola görə qurulur.
 ///
@@ -71,7 +72,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
           ]
         : const [
             _Tab(
-              title: 'Vaxt seç',
+              title: 'Kəşf et',
               icon: Icons.add_circle_outline,
               selectedIcon: Icons.add_circle,
               label: 'Bron et',
@@ -118,7 +119,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                     connected ? Icons.cloud_done_outlined : Icons.cloud_off_outlined,
                     size: 20,
                     color: connected
-                        ? const Color(0xFF059669)
+                        ? AppPalette.success
                         : Theme.of(context).colorScheme.outline,
                   ),
                 ),
@@ -126,11 +127,21 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
             },
           ),
           PopupMenuButton<String>(
+            tooltip: 'Hesab',
             onSelected: (value) {
               if (value == 'logout') context.read<AuthController>().logout();
             },
             itemBuilder: (context) => const [
-              PopupMenuItem(value: 'logout', child: Text('Çıxış')),
+              PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, size: 18),
+                    SizedBox(width: 10),
+                    Text('Çıxış'),
+                  ],
+                ),
+              ),
             ],
           ),
         ],
