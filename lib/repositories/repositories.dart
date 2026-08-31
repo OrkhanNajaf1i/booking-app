@@ -1,5 +1,6 @@
 import '../core/api/api_client.dart';
 import '../core/api/token_storage.dart';
+import '../core/location/nearby_filter.dart';
 import '../models/app_notification.dart';
 import '../models/availability.dart';
 import '../models/booking.dart';
@@ -295,9 +296,15 @@ class PublicRepository {
   const PublicRepository();
 
   /// Xidmət sahələri — hər birində neçə biznes olduğu ilə.
-  Future<List<ServiceCategory>> listCategories() async {
+  /// Kateqoriyalar. [near] verilsə sayğaclar yalnız həmin radiusdakı
+  /// bizneslər üzrə hesablanır — əks halda "3 həkim" yazır, açanda boş
+  /// çıxır.
+  Future<List<ServiceCategory>> listCategories({NearbyFilter? near}) async {
     final data = await ApiClient.instance.unwrap<dynamic>(
-      ApiClient.instance.dio.get<dynamic>('/public/categories'),
+      ApiClient.instance.dio.get<dynamic>(
+        '/public/categories',
+        queryParameters: near?.toQuery(),
+      ),
     );
     return _asList(data).map(ServiceCategory.fromJson).toList();
   }
@@ -307,6 +314,7 @@ class PublicRepository {
   Future<List<BusinessCard>> listBusinesses({
     String? category,
     String? query,
+    NearbyFilter? near,
   }) async {
     final data = await ApiClient.instance.unwrap<dynamic>(
       ApiClient.instance.dio.get<dynamic>(
@@ -314,6 +322,7 @@ class PublicRepository {
         queryParameters: {
           if (category != null && category.isNotEmpty) 'category': category,
           if (query != null && query.trim().isNotEmpty) 'q': query.trim(),
+          ...?near?.toQuery(),
         },
       ),
     );
