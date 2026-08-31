@@ -5,6 +5,7 @@ import '../models/app_notification.dart';
 import '../models/availability.dart';
 import '../models/booking.dart';
 import '../models/staff.dart';
+import '../models/phone_code.dart';
 
 /// Backend massiv qaytaranda bəzən birbaşa, bəzən `{data: [...]}` gəlir.
 List<Map<String, dynamic>> _asList(dynamic payload) {
@@ -23,6 +24,51 @@ List<Map<String, dynamic>> _asList(dynamic payload) {
 
 class AuthRepository {
   const AuthRepository();
+
+  /// Nömrəyə təsdiq kodu göndərir.
+  ///
+  /// Server nömrəni normallaşdırır — "050 111 22 33" da, "+994 50 111
+  /// 22 33" da eyni sətrə düşür. Təsdiq addımında **serverin
+  /// qaytardığı** forma göndərilir.
+  Future<PhoneCodeRequest> requestPhoneCode(String phone) async {
+    final data = await ApiClient.instance.unwrap<Map<String, dynamic>>(
+      ApiClient.instance.dio.post<dynamic>(
+        '/auth/phone/request',
+        data: {'phone': phone},
+      ),
+    );
+
+    return PhoneCodeRequest.fromJson(data);
+  }
+
+  /// Kodu təsdiqləyir və sessiyanı açır.
+  Future<SessionClaims> verifyPhoneCode({
+    required String phone,
+    required String code,
+    String fullName = '',
+  }) async {
+    final data = await ApiClient.instance.unwrap<Map<String, dynamic>>(
+      ApiClient.instance.dio.post<dynamic>(
+        '/auth/phone/verify',
+        data: {'phone': phone, 'code': code, 'full_name': fullName},
+      ),
+    );
+
+    final access = data['access_token'] as String?;
+    if (access == null) {
+      throw const ApiException(
+        code: 'NO_TOKEN',
+        message: 'Server token qaytarmadı',
+      );
+    }
+
+    await TokenStorage.instance.save(
+      access: access,
+      refresh: data['refresh_token'] as String?,
+    );
+
+    return TokenStorage.instance.claims!;
+  }
 
   Future<SessionClaims> login({
     required String email,

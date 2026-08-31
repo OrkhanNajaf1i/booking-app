@@ -4,10 +4,17 @@ import 'package:provider/provider.dart';
 import '../../state/app_state.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, required this.onShowRegister});
+  const LoginScreen({
+    super.key,
+    required this.onShowRegister,
+    this.onUsePhone,
+  });
 
   /// Qeydiyyat ekranina kecid.
   final VoidCallback onShowRegister;
+
+  /// Telefonla girise qayidis. Verilmese hemin duyme gorunmur.
+  final VoidCallback? onUsePhone;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -140,6 +147,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       onPressed: auth.isLoading ? null : widget.onShowRegister,
                       child: const Text('Hesabınız yoxdur? Qeydiyyatdan keçin'),
                     ),
+
+                    if (widget.onUsePhone != null)
+                      TextButton.icon(
+                        onPressed: auth.isLoading ? null : widget.onUsePhone,
+                        icon: const Icon(Icons.phone_outlined, size: 18),
+                        label: const Text('Telefon nömrəsi ilə daxil ol'),
+                      ),
                   ],
                 ),
               ),

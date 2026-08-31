@@ -46,6 +46,8 @@ class BusinessCard {
     this.city = '',
     this.address = '',
     this.distanceKm,
+    this.latitude,
+    this.longitude,
   });
 
   final String id;
@@ -69,6 +71,13 @@ class BusinessCard {
 
   /// Yalnız sorğuda koordinat göndəriləndə dolur.
   final double? distanceKm;
+
+  /// Filialın xəritə koordinatı. Sahib xəritədə yer seçməyibsə boş
+  /// olur — belə biznes yalnız siyahıda görünür.
+  final double? latitude;
+  final double? longitude;
+
+  bool get hasCoordinates => latitude != null && longitude != null;
 
   /// Kartın altında göstərilən sahə etiketi.
   ///
@@ -102,6 +111,8 @@ class BusinessCard {
         city: json['city'] as String? ?? '',
         address: json['address'] as String? ?? '',
         distanceKm: (json['distance_km'] as num?)?.toDouble(),
+        latitude: (json['latitude'] as num?)?.toDouble(),
+        longitude: (json['longitude'] as num?)?.toDouble(),
       );
 }
 
