@@ -3,17 +3,24 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/location/location_service.dart';
+import '../../core/location/nearby_filter.dart';
 import '../../models/staff.dart';
 import '../../repositories/repositories.dart';
 import 'widgets/booking_widgets.dart';
+import 'widgets/location_sheet.dart';
 
 /// Kəşf ekranı — müştəri xidmət göstərəni burada tapır.
 ///
-/// Axın: sahə (Bərbər / Diş Həkimi / Usta…) → həmin sahədəki bizneslər
-/// → biznes seçilir və bron ekranına keçilir.
+/// Axın: kateqoriya (Bərbər / Diş həkimi / Usta…) → həmin kateqoriyadakı
+/// bizneslər → biznes seçilir və bron ekranına keçilir.
 ///
-/// Axtarış sahə seçimini atlayır: adam birbaşa "Elit" yazıb bərbəri
-/// tapa bilər.
+/// Axtarış kateqoriya seçimini atlayır: adam birbaşa "Elit" yazıb
+/// bərbəri tapa bilər.
+///
+/// Yaxınlıq süzgəci hər üç görünüşə eyni cür təsir edir — kateqoriya
+/// sayğacları da radiusdakı bizneslərə görə hesablanır, əks halda
+/// "3 həkim" yazır, açanda boş çıxır.
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({super.key, required this.onBusinessSelected});
 
@@ -25,6 +32,7 @@ class DiscoverScreen extends StatefulWidget {
 
 class _DiscoverScreenState extends State<DiscoverScreen> {
   static const _repo = PublicRepository();
+  static const _location = LocationService();
 
   final _searchController = TextEditingController();
   Timer? _debounce;
@@ -33,8 +41,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   List<BusinessCard> _businesses = const [];
 
   /// null olanda kateqoriya siyahısı göstərilir.
-  String? _category;
+  ServiceCategory? _category;
   String _query = '';
+
+  NearbyFilter? _nearby;
 
   bool _loading = true;
   String? _error;
@@ -42,7 +52,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   @override
   void initState() {
     super.initState();
-    _loadCategories();
+    _restoreThenLoad();
   }
 
   @override
@@ -52,6 +62,15 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     super.dispose();
   }
 
+  /// Keçən dəfə seçilmiş yer bərpa olunur — adam hər açılışda eyni
+  /// rayonu yenidən seçməməlidir.
+  Future<void> _restoreThenLoad() async {
+    final saved = await _location.restore();
+    if (!mounted) return;
+    setState(() => _nearby = saved);
+    await _loadCategories();
+  }
+
   Future<void> _loadCategories() async {
     setState(() {
       _loading = true;
@@ -59,7 +78,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     });
 
     try {
-      final categories = await _repo.listCategories();
+      final categories = await _repo.listCategories(near: _nearby);
       if (!mounted) return;
       setState(() {
         _categories = categories;
@@ -82,8 +101,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
     try {
       final businesses = await _repo.listBusinesses(
-        category: _category,
+        category: _category?.slug,
         query: _query,
+        near: _nearby,
       );
       if (!mounted) return;
       setState(() {
@@ -99,6 +119,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     }
   }
 
+  /// Cari görünüşü yenidən yükləyir.
+  Future<void> _reload() =>
+      _showingCategories ? _loadCategories() : _loadBusinesses();
+
   /// Hər hərfdə sorğu göndərməmək üçün gecikdirilir.
   void _onSearchChanged(String value) {
     _debounce?.cancel();
@@ -112,8 +136,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     });
   }
 
-  void _openCategory(String name) {
-    setState(() => _category = name);
+  void _openCategory(ServiceCategory category) {
+    setState(() => _category = category);
     _loadBusinesses();
   }
 
@@ -127,7 +151,17 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     _loadCategories();
   }
 
-  /// Sahə siyahısı yalnız kateqoriya seçilməyib və axtarış boş olanda.
+  Future<void> _pickLocation() async {
+    final result = await LocationSheet.show(context, current: _nearby);
+    if (result == null || !mounted) return;
+
+    final next = result.isCleared ? null : result;
+    setState(() => _nearby = next);
+    await _location.save(next);
+    await _reload();
+  }
+
+  /// Kateqoriya siyahısı yalnız kateqoriya seçilməyib və axtarış boş olanda.
   bool get _showingCategories => _category == null && _query.trim().isEmpty;
 
   @override
@@ -159,26 +193,33 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           ),
         ),
 
-        // ─── Seçilmiş sahə ───────────────────────────────────
+        // ─── Yaxınlıq zolağı ─────────────────────────────────
+        _NearbyBar(filter: _nearby, onTap: _pickLocation),
+
+        // ─── Seçilmiş kateqoriya ─────────────────────────────
         if (_category != null)
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            padding: const EdgeInsets.fromLTRB(8, 4, 16, 4),
             child: Row(
               children: [
                 IconButton(
                   onPressed: _backToCategories,
                   icon: const Icon(Icons.arrow_back),
-                  tooltip: 'Sahələrə qayıt',
+                  tooltip: 'Kateqoriyalara qayıt',
                   style: IconButton.styleFrom(
                     minimumSize: const Size(36, 36),
                     padding: EdgeInsets.zero,
                   ),
                 ),
                 const SizedBox(width: 4),
-                Text(
-                  _category!,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
+                Expanded(
+                  child: Text(
+                    _category!.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],
@@ -201,9 +242,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
     if (_showingCategories) {
       if (_categories.isEmpty) {
-        return const EmptyState(
+        return EmptyState(
           icon: Icons.storefront_outlined,
-          message: 'Hazırda əlçatan xidmət yoxdur',
+          message: _nearby == null
+              ? 'Hazırda əlçatan xidmət yoxdur'
+              : '${_nearby!.radiusLabel} radiusunda xidmət tapılmadı.\n'
+                  'Məsafəni artırın və ya başqa ünvan seçin.',
         );
       }
 
@@ -222,7 +266,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             final category = _categories[index];
             return _CategoryTile(
               category: category,
-              onTap: () => _openCategory(category.name),
+              onTap: () => _openCategory(category),
             );
           },
         ),
@@ -234,7 +278,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         icon: Icons.search_off_outlined,
         message: _query.trim().isNotEmpty
             ? '"${_query.trim()}" üzrə nəticə tapılmadı'
-            : 'Bu sahədə hələ biznes yoxdur',
+            : 'Bu kateqoriyada hələ biznes yoxdur',
       );
     }
 
@@ -244,79 +288,225 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         padding: const EdgeInsets.all(16),
         itemCount: _businesses.length,
         separatorBuilder: (_, __) => const SizedBox(height: 8),
-        itemBuilder: (context, index) {
-          final business = _businesses[index];
-
-          return Card(
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: () => widget.onBusinessSelected(business),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primaryContainer,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        _initials(business.name),
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: theme.colorScheme.onPrimaryContainer,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            business.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          if (business.subtitle.isNotEmpty) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              business.subtitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    Icon(
-                      Icons.chevron_right,
-                      color: theme.colorScheme.outline,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
+        itemBuilder: (context, index) => _BusinessTile(
+          business: _businesses[index],
+          onTap: () => widget.onBusinessSelected(_businesses[index]),
+        ),
       ),
     );
   }
+}
+
+// ─── Yaxınlıq zolağı ─────────────────────────────────────────
+
+class _NearbyBar extends StatelessWidget {
+  const _NearbyBar({required this.filter, required this.onTap});
+
+  final NearbyFilter? filter;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final active = filter != null;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+      child: Material(
+        color: active
+            ? theme.colorScheme.primaryContainer
+            : theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(10),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                Icon(
+                  active ? Icons.near_me : Icons.near_me_outlined,
+                  size: 17,
+                  color: active
+                      ? theme.colorScheme.onPrimaryContainer
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        active ? filter!.label : 'Yaxınlıqdakıları göstər',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: active
+                              ? theme.colorScheme.onPrimaryContainer
+                              : theme.colorScheme.onSurface,
+                        ),
+                      ),
+                      if (active)
+                        Text(
+                          '${filter!.radiusLabel} radius',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onPrimaryContainer
+                                .withValues(alpha: 0.75),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.expand_more,
+                  size: 18,
+                  color: active
+                      ? theme.colorScheme.onPrimaryContainer
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Biznes kartı ────────────────────────────────────────────
+
+class _BusinessTile extends StatelessWidget {
+  const _BusinessTile({required this.business, required this.onTap});
+
+  final BusinessCard business;
+  final VoidCallback onTap;
 
   static String _initials(String name) {
     final parts = name.trim().split(RegExp(r'\s+'));
     final letters = parts.take(2).map((p) => p.isEmpty ? '' : p[0]).join();
     return letters.toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final distance = business.distanceLabel;
+
+    // Ünvan sətri: "Nərimanov, Bakı" — ikisi də olmaya bilər.
+    final place = [business.address, business.city]
+        .where((part) => part.isNotEmpty)
+        .join(', ');
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  _initials(business.name),
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.onPrimaryContainer,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      business.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (business.subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        business.subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                    if (place.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.location_on_outlined,
+                            size: 12,
+                            color: theme.colorScheme.outline,
+                          ),
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Text(
+                              place,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.outline,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (distance != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.secondaryContainer,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        distance,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSecondaryContainer,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 4),
+                  Icon(Icons.chevron_right, color: theme.colorScheme.outline),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -326,29 +516,43 @@ class _CategoryTile extends StatelessWidget {
   const _CategoryTile({required this.category, required this.onTap});
 
   final ServiceCategory category;
+
   final VoidCallback onTap;
 
-  /// Sahə adına uyğun ikon — tanınmayan sahə üçün ümumi mağaza ikonu.
-  static IconData _iconFor(String name) {
-    final lower = name.toLowerCase();
-    if (lower.contains('bərbər') || lower.contains('berber') ||
-        lower.contains('barber') || lower.contains('saç')) {
-      return Icons.content_cut;
+  /// Serverdən gələn ikon açarı → Material ikonu.
+  ///
+  /// Açar taksonomiya ilə birlikdə serverdə təyin olunur; burada yalnız
+  /// göstərilişi var. Tanınmayan açar üçün ümumi mağaza ikonu qalır —
+  /// serverə yeni kateqoriya əlavə olunanda tətbiq sınmır.
+  static IconData _iconFor(String key) {
+    switch (key) {
+      case 'dentist':
+        return Icons.medication_liquid_outlined;
+      case 'hospital':
+        return Icons.local_hospital_outlined;
+      case 'doctor':
+        return Icons.medical_services_outlined;
+      case 'lab':
+        return Icons.biotech_outlined;
+      case 'barber':
+        return Icons.content_cut;
+      case 'beauty':
+        return Icons.spa_outlined;
+      case 'spa':
+        return Icons.self_improvement_outlined;
+      case 'fitness':
+        return Icons.fitness_center_outlined;
+      case 'vet':
+        return Icons.pets_outlined;
+      case 'master':
+        return Icons.handyman_outlined;
+      case 'education':
+        return Icons.school_outlined;
+      case 'photo':
+        return Icons.photo_camera_outlined;
+      default:
+        return Icons.storefront_outlined;
     }
-    if (lower.contains('həkim') || lower.contains('hekim') ||
-        lower.contains('diş') || lower.contains('dentist') ||
-        lower.contains('klinika') || lower.contains('health')) {
-      return Icons.medical_services_outlined;
-    }
-    if (lower.contains('usta') || lower.contains('repair') ||
-        lower.contains('təmir')) {
-      return Icons.handyman_outlined;
-    }
-    if (lower.contains('gözəllik') || lower.contains('beauty') ||
-        lower.contains('salon')) {
-      return Icons.spa_outlined;
-    }
-    return Icons.storefront_outlined;
   }
 
   @override
@@ -372,7 +576,7 @@ class _CategoryTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(11),
                 ),
                 child: Icon(
-                  _iconFor(category.name),
+                  _iconFor(category.icon),
                   size: 21,
                   color: theme.colorScheme.onPrimaryContainer,
                 ),
