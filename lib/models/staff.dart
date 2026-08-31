@@ -3,16 +3,30 @@
 /// Ayrıca cədvəl deyil: bizneslərin `service_category` sahəsindən
 /// yığılır, ona görə yeni sahə əlavə etmək üçün kod dəyişmir.
 class ServiceCategory {
-  const ServiceCategory({required this.name, required this.count});
+  const ServiceCategory({
+    required this.slug,
+    required this.name,
+    required this.count,
+    this.icon = '',
+  });
+
+  /// Filtrdə işlənən dəyişməz açar ("dentist").
+  /// Ad tərcümə oluna bilər, slug yox — filtr buna bağlanır.
+  final String slug;
 
   final String name;
+
+  /// Serverdən gələn ikon açarı — admin panel ilə eyni adlandırma.
+  final String icon;
 
   /// Bu sahədə neçə aktiv biznes var.
   final int count;
 
   factory ServiceCategory.fromJson(Map<String, dynamic> json) =>
       ServiceCategory(
+        slug: json['slug'] as String? ?? '',
         name: json['name'] as String? ?? '',
+        icon: json['icon'] as String? ?? '',
         count: (json['count'] as num?)?.toInt() ?? 0,
       );
 }
@@ -22,33 +36,72 @@ class BusinessCard {
   const BusinessCard({
     required this.id,
     required this.name,
+    this.category = '',
+    this.categoryName = '',
+    this.categoryIcon = '',
     this.industry = '',
     this.serviceCategory = '',
     this.phone = '',
     this.businessType = '',
+    this.city = '',
+    this.address = '',
+    this.distanceKm,
   });
 
   final String id;
   final String name;
+
+  /// Sabit kateqoriya slug-ı — qruplaşdırma buna görə gedir.
+  final String category;
+  final String categoryName;
+  final String categoryIcon;
+
   final String industry;
+
+  /// Sahibin öz sözü ("Kardioloq") — kateqoriyadan daha dəqiqdir.
   final String serviceCategory;
+
   final String phone;
   final String businessType;
 
+  final String city;
+  final String address;
+
+  /// Yalnız sorğuda koordinat göndəriləndə dolur.
+  final double? distanceKm;
+
   /// Kartın altında göstərilən sahə etiketi.
+  ///
+  /// İxtisas varsa o üstündür: "Kardioloq" müştəri üçün "Həkim"dən
+  /// daha məlumatlıdır.
   String get subtitle {
     if (serviceCategory.isNotEmpty) return serviceCategory;
+    if (categoryName.isNotEmpty) return categoryName;
     if (industry.isNotEmpty) return industry;
     return '';
+  }
+
+  /// "1.2 km" / "350 m" — kilometrin altı metrlə daha oxunaqlıdır.
+  String? get distanceLabel {
+    final value = distanceKm;
+    if (value == null) return null;
+    if (value < 1) return '${(value * 1000).round()} m';
+    return '${value.toStringAsFixed(1)} km';
   }
 
   factory BusinessCard.fromJson(Map<String, dynamic> json) => BusinessCard(
         id: json['id'] as String,
         name: json['name'] as String? ?? '',
+        category: json['category'] as String? ?? '',
+        categoryName: json['category_name'] as String? ?? '',
+        categoryIcon: json['category_icon'] as String? ?? '',
         industry: json['industry'] as String? ?? '',
         serviceCategory: json['service_category'] as String? ?? '',
         phone: json['phone'] as String? ?? '',
         businessType: json['business_type'] as String? ?? '',
+        city: json['city'] as String? ?? '',
+        address: json['address'] as String? ?? '',
+        distanceKm: (json['distance_km'] as num?)?.toDouble(),
       );
 }
 
