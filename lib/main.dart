@@ -10,6 +10,7 @@ import 'features/auth/register_screen.dart';
 import 'features/shell/home_shell.dart';
 import 'repositories/repositories.dart';
 import 'state/app_state.dart';
+import 'features/auth/phone_login_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -56,7 +57,7 @@ class _Root extends StatefulWidget {
 
 class _RootState extends State<_Root> {
   /// Sessiya yoxdursa login yoxsa qeydiyyat gosterilsin?
-  bool _showRegister = false;
+  _AuthScreen _authScreen = _AuthScreen.phone;
 
   @override
   void initState() {
@@ -74,13 +75,24 @@ class _RootState extends State<_Root> {
     final claims = auth.claims;
 
     if (claims == null) {
-      return _showRegister
-          ? RegisterScreen(
-              onShowLogin: () => setState(() => _showRegister = false),
-            )
-          : LoginScreen(
-              onShowRegister: () => setState(() => _showRegister = true),
-            );
+      // Müştəri üçün əsas yol telefon nömrəsidir: şifrə unudulur,
+      // telefon isə əldədir. E-poçt/şifrə ekranı saxlanılır — xidmət
+      // göstərənlər tətbiqə həmin hesabla girir.
+      switch (_authScreen) {
+        case _AuthScreen.phone:
+          return PhoneLoginScreen(
+            onUseEmail: () => setState(() => _authScreen = _AuthScreen.email),
+          );
+        case _AuthScreen.email:
+          return LoginScreen(
+            onShowRegister: () => setState(() => _authScreen = _AuthScreen.register),
+            onUsePhone: () => setState(() => _authScreen = _AuthScreen.phone),
+          );
+        case _AuthScreen.register:
+          return RegisterScreen(
+            onShowLogin: () => setState(() => _authScreen = _AuthScreen.email),
+          );
+      }
     }
 
     // BookingController rola bağlıdır — rol dəyişəndə yenisi qurulmalıdır,
@@ -95,3 +107,6 @@ class _RootState extends State<_Root> {
     );
   }
 }
+
+/// Giriş axınının hansı addımda olduğu.
+enum _AuthScreen { phone, email, register }
