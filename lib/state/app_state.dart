@@ -8,6 +8,7 @@ import '../core/realtime/realtime_service.dart';
 import '../models/app_notification.dart';
 import '../models/booking.dart';
 import '../repositories/repositories.dart';
+import '../models/phone_code.dart';
 
 // ═════════════════════════════════════════════════════════════
 // AUTH
@@ -43,6 +44,62 @@ class AuthController extends ChangeNotifier {
 
     try {
       _claims = await _repository.login(email: email, password: password);
+      RealtimeService.instance.start();
+      return true;
+    } on ApiException catch (exception) {
+      _error = exception.message;
+      return false;
+    } catch (_) {
+      _error = 'Gözlənilməz xəta baş verdi';
+      return false;
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
+  // ── Telefonla giriş ──────────────────────────────────────
+  //
+  // Şifrə yoxdur: nömrəyə kod gəlir, kod təsdiqlənəndə sessiya açılır.
+  // Hesab yoxdursa serverdə yaradılır.
+
+  /// Nömrəyə kod göndərir. Alınmasa `null` qayıdır və [error] dolur.
+  Future<PhoneCodeRequest?> requestPhoneCode(String phone) async {
+    _loading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      return await _repository.requestPhoneCode(phone);
+    } on ApiException catch (exception) {
+      _error = exception.message;
+      return null;
+    } catch (_) {
+      _error = 'Gözlənilməz xəta baş verdi';
+      return null;
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Kodu təsdiqləyir. [phone] serverin qaytardığı normallaşdırılmış
+  /// forma olmalıdır.
+  Future<bool> verifyPhoneCode({
+    required String phone,
+    required String code,
+    String fullName = '',
+  }) async {
+    _loading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      _claims = await _repository.verifyPhoneCode(
+        phone: phone,
+        code: code,
+        fullName: fullName,
+      );
       RealtimeService.instance.start();
       return true;
     } on ApiException catch (exception) {
