@@ -31,6 +31,8 @@ dependencies:
   # Icaze verilmese tetbiq islemeye davam edir: istifadeci unvani
   # elle secir (bax: lib/core/location/).
   geolocator: ^13.0.2
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.1
 
   # ─────────────────────────────────────────────────────────────
   # PUSH (opsional): telefon bağlı olanda bildiriş üçün.
