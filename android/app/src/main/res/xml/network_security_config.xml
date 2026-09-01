@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Yalniz DEBUG build ucun.
+
+  Android 9+ sifrelenmemis HTTP-ni bloklayir. Lokal development-de
+  backend HTTP uzerinde isleyir ve unvani her mühitde ferqlidir:
+  emulyatorda 10.0.2.2, real telefonda kompyuterin Wi-Fi unvani
+  (192.168.x.x). Sabit siyahi saxlamaq her sebeke deyisikliyinde
+  yenilenme teleb edirdi, ona gore debug-da butun cleartext acilir.
+
+  Release build bu faylı istifade etmir — prod HTTPS teleb edir.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
