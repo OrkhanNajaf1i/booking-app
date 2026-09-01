@@ -32,7 +32,7 @@ class ApiClient {
       BaseOptions(
         baseUrl: AppConfig.apiBaseUrl,
         connectTimeout: AppConfig.requestTimeout,
-        receiveTimeout: AppConfig.requestTimeout,
+        receiveTimeout: AppConfig.responseTimeout,
         headers: {'Content-Type': 'application/json'},
         validateStatus: (status) => status != null && status < 500,
       ),
