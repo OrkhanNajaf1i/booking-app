@@ -25,4 +25,12 @@ class AppConfig {
 
   /// Şəbəkə sorğuları üçün gözləmə müddəti.
   static const Duration requestTimeout = Duration(seconds: 20);
+
+  /// Cavabın gözlənildiyi müddət.
+  ///
+  /// Pulsuz hostinqdə server hərəkətsizlikdən yatır və ilk sorğuda
+  /// oyanması yarım dəqiqəyə qədər çəkir. 20 saniyə ilə tətbiq həmin
+  /// sorğunu həmişə "əlaqə yoxdur" kimi göstərirdi — istifadəçi isə
+  /// bunu tətbiqin sınması kimi görür.
+  static const Duration responseTimeout = Duration(seconds: 60);
 }
